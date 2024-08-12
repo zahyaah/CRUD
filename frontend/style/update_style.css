@@ -1,0 +1,59 @@
+* {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+h2 {
+    font-size: 2em;
+    text-align: center;
+}
+
+.navMenu a[href="/"] {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007BFF;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 1em;
+    transition: background-color 0.3s;
+    text-align: center;
+    margin: 10px;
+}
+
+.navMenu a[href="/"]:hover {
+    background-color: #0056b3;
+}
+
+
+#formContainer {
+    display: flex; 
+    flex-direction: column;
+    align-items: center;
+    width: 100vw;
+    padding: 40px;
+}
+
+#formContainer h3 {
+    font-size: 2.1em;
+}
+
+#formContainer form {
+    display: flex;
+    flex-direction: column; 
+    gap: 2;
+    margin: 10px;
+}
+
+#formContainer form input {
+    width: 350px;
+    height: 35px;
+    font-size: 1.2em;
+}
+
+#formContainer form button {
+    width: 350px;
+    height: 35px;
+    margin-top: 10px;
+}

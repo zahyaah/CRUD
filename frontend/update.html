@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Products</title>
+    <link rel="stylesheet" href="./style/product_style.css">
+    <link rel="stylesheet" href="./style/update_style.css">
+    <script src="./script/product_script.js"></script>
+    <script src="./script/update_script.js"></script>
+</head>
+<body>
+    <header>
+        <h1>The "Online" Warehouse</h1>
+        <h2>Update</h2>
+        <nav>
+            <ul class="navMenu">
+                <li><a href="/">Back</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container"> 
+        <table class="updateTable">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Category</th>
+                <th>Stock Quantity</th>
+                <th>Manufacturer</th>
+                <th>Release Date <br>YYYY-MM-DD</th>
+                <th>Rating</th>
+            </tr>
+         </table>
+    </div>
+    <div id="formContainer">
+        <h3>Edit Product</h3>
+        <p>Click on the row you want to update</p>
+        <form id="editForm">
+            <label for="editId">ID:</label>
+            <input type="text" id="editId" readonly>
+            <br>
+            <label for="editName">Name:</label>
+            <input type="text" id="editName">
+            <br>
+            <label for="editDesc">Description:</label>
+            <input type="text" id="editDesc">
+            <br>
+            <label for="editPrice">Price:</label>
+            <input type="number" step="0.01" id="editPrice">
+            <br>
+            <label for="editCat">Category:</label>
+            <input type="text" id="editCat">
+            <br>
+            <label for="editStock">Stock Quantity:</label>
+            <input type="number" id="editStock">
+            <br>
+            <label for="editManf">Manufacturer:</label>
+            <input type="text" id="editManf">
+            <br>
+            <label for="editRel">Release Date:</label>
+            <input type="date" id="editRel">
+            <br>
+            <label for="editRating">Rating:</label>
+            <input type="number" step="0.1" min="1" max="5" id="editRating">
+            <br>
+            <button type="submit">Update Product</button>
+        </form>
+    </div>
+    
+</body>
+</html>

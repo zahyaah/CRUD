@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Create</title>
+    <link rel="stylesheet" href="./style/create_style.css">
+    <script src="./script/create_script.js"></script> 
+</head>
+<body>
+    <header>
+        <h1>The "Online" Warehouse</h1>
+        <nav>
+            <ul class="navMenu">
+                <li><a href="/">Back</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h3>Add your product</h3>
+        <form id="product-form" class="formContainer">
+            <label for="id">Enter ID: </label>
+            <input type="number" id="id" placeholder="ID">
+    
+            <label for="name">Enter name: </label>
+            <input type="text" id="name" placeholder="Name: John Doe">
+    
+            <label for="desc">Enter description: </label>
+            <input type="text" id="desc" placeholder="Description">
+    
+            <label for="price">Enter price: </label>
+            <input type="number" id="price" placeholder="Price">
+    
+            <label for="cat">Enter category: </label>
+            <input type="text" id="cat" placeholder="Category">
+    
+            <label for="stock">Enter stock quantity: </label>
+            <input type="number" id="stock" placeholder="Stock Quantity">
+    
+            <label for="manf">Enter manufacturer: </label>
+            <input type="text" id="manf" placeholder="Manufacturer">
+    
+            <label for="rel">Enter release date: </label>
+            <input type="date" id="rel" placeholder="YYYY-MM-DD">
+    
+            <label for="rating">Enter rating: </label>
+            <input type="number" id="rating" placeholder="Rating">
+    
+            <button type="submit">Create</button>
+        </form>
+    </div>
+</body>
+</html>

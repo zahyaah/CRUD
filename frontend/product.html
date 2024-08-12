@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Products</title>
+    <link rel="stylesheet" href="./style/product_style.css">
+    <link rel="stylesheet" href="./style/delete_style.css">
+    <link rel="stylesheet" href="./style/productid_style.css">
+    <script src="./script/product_script.js"></script>
+    <script src="./script/delete_script.js"></script>
+    <script src="./script/productid_script.js"></script>
+</head>
+<body>
+    <header>
+        <h1>The "Online" Warehouse</h1>
+        <nav>
+            <ul class="navMenu">
+                <li><a href="./create.html">Add a Product</a></li>
+                <li><a href="./update.html">Update a Product</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container"> 
+        <table class="tableContainer">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Category</th>
+                <th>Stock Quantity</th>
+                <th>Manufacturer</th>
+                <th>Release Date <br>YYYY-MM-DD</th>
+                <th>Rating</th>
+            </tr>
+         </table>
+    </div>
+    <div class="formContainer">
+        <form id="product-form">
+            <label for="proId">Enter the Product ID to be deleted: </label>
+            <br>
+            <input type="number" min="1" id="proId">
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+
+    <div class="overlay">
+        <div class="card">
+            <button class="close-button">&times;</button>
+            <div class="card-content">
+                <p><strong>ID:</strong><span id="id"></span></p>
+                <p><strong>Name:</strong><span id="name"></span></p>
+                <p><strong>Description:</strong><span id="description"></span></p>
+                <p><strong>Price:</strong><span id="price"></span></p>
+                <p><strong>Category:</strong><span id="category"></span></p>
+                <p><strong>Stock Quantity:</strong><span id="stock"></span></p>
+                <p><strong>Manufacturer:</strong><span id="manf"></span></p>
+                <p><strong>Release Date:</strong><span id="rel"></span></p>
+                <p><strong>Rating:</strong><span id="rating"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="popup" id="popup">
+        Click on a table row to view the details in a card.
+    </div>
+</body>
+</html>

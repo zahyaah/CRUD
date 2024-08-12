@@ -1,0 +1,141 @@
+* {
+    margin: 0; 
+    padding: 0;
+}
+
+header {
+    background-color:  #84D6D2;
+    padding: 30px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 3.5em;
+    text-align: center;
+    font-weight: bold;
+}
+
+h2 {
+    text-align: center;
+}
+
+nav {
+    margin-top: 10px;
+}
+.navMenu {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    gap: 15px;
+    justify-content: space-evenly;
+}
+
+.navMenu li {
+    margin: 0;
+}
+
+.navMenu a[href="/"] {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007BFF;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 1em;
+    transition: background-color 0.3s;
+    text-align: center;
+    margin: 10px;
+}
+
+.navMenu a[href="/"]:hover {
+    background-color: #0056b3;
+}
+
+
+.container {
+    display: flex; 
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100vw;
+    padding: 40px;
+}
+
+.container h3 {
+    font-size: 1.9em;
+}
+
+#product-form {
+    display: flex;
+    flex-direction: column; 
+    gap: 2;
+    margin: 10px;
+}
+
+#product-form label {
+    font-size: 1em;
+
+}
+
+#product-form input {
+    width: 350px;
+    height: 35px;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+#product-form button {
+    width: 100%;
+    height: 35px;
+    font-size: 1em;
+    border: none;
+    border-radius: 4px;
+    background-color: #007BFF;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#product-form button:hover {
+    background-color: #0056b3;
+}
+
+
+@media (min-width: 600px) {
+    .formContainer {
+        max-width: 450px; 
+    }
+
+    input {
+        height: 30px;
+    }
+
+    button {
+        height: 35px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .formContainer {
+        max-width: 500px; 
+    }
+
+    input {
+        height: 28px; 
+    }
+
+    button {
+        height: 32px; 
+    }
+}
+
+@media (orientation: landscape) and (max-width: 800px) {
+    .container {
+        padding: 20px;
+        flex-direction: row;
+    }
+
+    .formContainer {
+        width: 80%;
+    }
+}

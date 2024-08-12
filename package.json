@@ -1,0 +1,20 @@
+{
+  "name": "hackathon-zayd",
+  "version": "1.0.0",
+  "description": "Hackathon - Zayd",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node --watch --env-file=.env ./backend/server.js"
+  },
+  "author": "kzaydahmed",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "mysql2": "^3.11.0"
+  },
+  "devDependencies": {
+    "chalk": "^5.3.0",
+    "morgan": "^1.10.0"
+  }
+}
