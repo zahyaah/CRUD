@@ -1,0 +1,23 @@
+{
+  "target": "pre-revamp server (express 4.19, single connection, no idempotency)",
+  "config": {
+    "rate": 400,
+    "duration": "60s",
+    "duplicatesPerKey": 4
+  },
+  "throughputRps": 400.0118198567828,
+  "totalRequests": 24001,
+  "latencyMs": {
+    "p50": 1.656,
+    "p95": 11.657,
+    "p99": 118.21,
+    "max": 210.99
+  },
+  "outcomes": {
+    "accepted201": 6001,
+    "serverError500": 18000,
+    "transportFailure": 0,
+    "other": 0
+  },
+  "expectedUniqueProducts": 6001
+}

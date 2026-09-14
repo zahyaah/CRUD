@@ -1,0 +1,11 @@
+{
+  "name": "legacy-baseline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The pre-revamp server, verbatim, at its original pinned dependency versions. Exists only to produce a fair before/after load-test baseline.",
+  "dependencies": {
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.11.0"
+  }
+}

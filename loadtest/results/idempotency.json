@@ -1,0 +1,23 @@
+{
+  "runId": "x6",
+  "config": {
+    "rate": 400,
+    "duration": "60s",
+    "duplicatesPerKey": 4
+  },
+  "throughputRps": 399.78710465835394,
+  "totalRequests": 23987,
+  "latencyMs": {
+    "p50": 1.768,
+    "p95": 15.819099999999997,
+    "p99": 51.41835999999995,
+    "max": 326.618
+  },
+  "outcomes": {
+    "created": 5997,
+    "coalesced": 17990,
+    "unexpected": 0
+  },
+  "httpFailureRate": 0,
+  "dedupRate": 0.7499895776879143
+}

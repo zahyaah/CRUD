@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/components/field.tsx","./src/components/productform.tsx","./src/hooks/useproducts.ts","./src/routes/concurrencylabpage.tsx","./src/routes/newproductpage.tsx","./src/routes/productspage.tsx","./vite.config.ts"],"version":"5.9.3"}
