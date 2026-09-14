@@ -27,10 +27,8 @@ interface IdempotencyRow extends RowDataPacket {
 const MICROS_PER_MS = 1000;
 
 /**
- * Attempts to become the leader for a key.
- *
  * The INSERT is the entire mutual-exclusion mechanism: the PRIMARY KEY means exactly one
- * concurrent caller can succeed, and the database — not the application — is the arbiter.
+ * concurrent caller can succeed, so the database rather than the application is the arbiter.
  * Everyone else becomes a waiter.
  */
 export async function claimLeadership(
@@ -83,7 +81,7 @@ export async function find(db: Queryable, key: string): Promise<IdempotencyRecor
 }
 
 /**
- * Takes over a key whose leader stopped renewing — a crashed or hung process.
+ * Takes over a key whose leader stopped renewing, meaning a crashed or hung process.
  *
  * The lease check lives in the WHERE clause so the read and the takeover are one atomic
  * statement; two waiters racing to steal cannot both see an expired lease and both win.
@@ -110,7 +108,7 @@ export async function stealLeadership(
  * Takes over a key whose previous attempt failed, so the same key can be retried later.
  *
  * Without this a single transient failure would burn the key forever and every subsequent
- * retry — the exact thing idempotency keys exist to make safe — would replay the failure.
+ * retry, the exact thing idempotency keys exist to make safe, would replay the failure.
  * Only attempted once, before waiting begins, so a waiter already blocked on a leader that
  * then fails still receives that failure rather than silently re-running the work.
  */
@@ -123,11 +121,35 @@ export async function reclaimFailed(
 ): Promise<boolean> {
   const [result] = await db.execute<ResultSetHeader>(
     `UPDATE idempotency_key
-        SET state = 'processing', leader_token = ?, request_fingerprint = ?,
+        SET state = 'processing', leader_token = ?,
             lease_expires_at = DATE_ADD(NOW(3), INTERVAL ? MICROSECOND),
             error_message = NULL, completed_at = NULL
-      WHERE idempotency_key = ? AND state = 'failed'`,
-    [leaderToken, fingerprint, leaseMs * MICROS_PER_MS, key],
+      WHERE idempotency_key = ? AND state = 'failed' AND request_fingerprint = ?`,
+    [leaderToken, leaseMs * MICROS_PER_MS, key, fingerprint],
+  );
+  return result.affectedRows === 1;
+}
+
+/**
+ * Extends a live leader's lease. Without this the lease is not a liveness signal at all but a
+ * hard deadline on the operation: a leader merely slower than the lease would be stolen from,
+ * roll back, and the replacement would be stolen from in turn, so a sustained slowdown could
+ * livelock a key instead of degrading it.
+ *
+ * Returns false once the caller is no longer the leader, which lets it stop early rather than
+ * finish work the fence will discard.
+ */
+export async function renewLease(
+  db: Queryable,
+  key: string,
+  leaderToken: string,
+  leaseMs: number,
+): Promise<boolean> {
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE idempotency_key
+        SET lease_expires_at = DATE_ADD(NOW(3), INTERVAL ? MICROSECOND)
+      WHERE idempotency_key = ? AND leader_token = ? AND state = 'processing'`,
+    [leaseMs * MICROS_PER_MS, key, leaderToken],
   );
   return result.affectedRows === 1;
 }

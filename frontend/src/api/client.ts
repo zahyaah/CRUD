@@ -1,4 +1,4 @@
-import type { CreateProductInput, Product, UpdateProductInput } from "@warehouse/shared";
+import type { CreateProductInput, Page, Product, UpdateProductInput } from "@warehouse/shared";
 
 export interface ApiErrorBody {
   error: {
@@ -50,17 +50,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-export function listProducts(): Promise<Product[]> {
-  return request<Product[]>("/products");
+export function listProducts(limit: number, offset: number): Promise<Page<Product>> {
+  return request<Page<Product>>(`/products?limit=${limit}&offset=${offset}`);
 }
 
-export function getProduct(id: number): Promise<Product> {
-  return request<Product>(`/products/${id}`);
+/** Reads only the page envelope's total, so the cost does not grow with the table. */
+export async function countProducts(): Promise<number> {
+  const page = await listProducts(1, 0);
+  return page.total;
 }
 
 /**
  * The key is generated once per logical create and reused by every retry, so a resubmitted
- * form — whether from a double click or a network retry — resolves to the same product.
+ * form, whether from a double click or a network retry, resolves to the same product.
  */
 export function createProduct(input: CreateProductInput, idempotencyKey: string): Promise<Product> {
   return request<Product>("/products", {

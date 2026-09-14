@@ -2,10 +2,11 @@ import type { Product, ProductFields } from "@warehouse/shared";
 import { useState } from "react";
 import { ApiError } from "../api/client";
 import { ProductForm, toDraft } from "../components/ProductForm";
-import { useDeleteProduct, useProducts, useUpdateProduct } from "../hooks/useProducts";
+import { PAGE_SIZE, useDeleteProduct, useProducts, useUpdateProduct } from "../hooks/useProducts";
 
 export function ProductsPage() {
-  const { data: products, isPending, isError, error } = useProducts();
+  const [offset, setOffset] = useState(0);
+  const { data: page, isPending, isError, error } = useProducts(offset);
   const update = useUpdateProduct();
   const remove = useDeleteProduct();
   const [editing, setEditing] = useState<Product | null>(null);
@@ -35,11 +36,13 @@ export function ProductsPage() {
       <header className="page-head">
         <h1 className="page-head__title">Inventory</h1>
         <p className="page-head__sub">
-          {products.length} {products.length === 1 ? "product" : "products"}
+          {page.total} {page.total === 1 ? "product" : "products"}
+          {page.total > page.items.length &&
+            ` (showing ${page.offset + 1}\u2013${page.offset + page.items.length})`}
         </p>
       </header>
 
-      {products.length === 0 ? (
+      {page.items.length === 0 ? (
         <p className="empty">No products yet. Add one to get started.</p>
       ) : (
         <div className="table-wrap">
@@ -57,7 +60,7 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
+              {page.items.map((product) => (
                 <tr key={product.id}>
                   <td>
                     <span className="table__name">{product.name}</span>
@@ -87,6 +90,28 @@ export function ProductsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {page.total > PAGE_SIZE && (
+        <nav className="pager" aria-label="Inventory pages">
+          <button
+            className="button"
+            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
+            disabled={offset === 0}
+          >
+            Previous
+          </button>
+          <span className="muted" aria-live="polite">
+            Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(page.total / PAGE_SIZE)}
+          </span>
+          <button
+            className="button"
+            onClick={() => setOffset((o) => o + PAGE_SIZE)}
+            disabled={offset + PAGE_SIZE >= page.total}
+          >
+            Next
+          </button>
+        </nav>
       )}
 
       {editing && (

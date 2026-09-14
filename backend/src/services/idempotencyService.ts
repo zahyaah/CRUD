@@ -15,8 +15,11 @@ export interface Executed {
 }
 
 /**
- * Receives the leader's transaction. The operation's writes must go through it, or the
- * fencing check in `runAsLeader` cannot roll them back.
+ * Receives the leader's transaction.
+ *
+ * At-most-once holds only for work done through this handle. A side effect outside it (a
+ * write on the pool, an email, a payment call) runs again whenever a lease is stolen or a
+ * failed key is reclaimed, because only the transaction can be rolled back.
  */
 export type IdempotentOperation = (tx: PoolConnection) => Promise<Executed>;
 
@@ -27,16 +30,20 @@ const LOST_LEASE = Symbol("lost-lease");
 
 /**
  * Stable fingerprint of a request body. Object keys are sorted so that two semantically
- * identical bodies serialised in a different order still compare equal — otherwise a
+ * identical bodies serialised in a different order still compare equal. Otherwise a
  * legitimate retry from a client that reorders its JSON would be misread as key reuse.
+ *
+ * The comparison is by code unit, not `localeCompare`: locale-aware ordering varies with the
+ * ICU data a process was built against, so two API instances could hash the same body
+ * differently and reject each other's retries.
  */
-function fingerprint(body: unknown): string {
+export function fingerprint(body: unknown): string {
   const canonical = JSON.stringify(body, (_key, value: unknown) => {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
       return value;
     }
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     );
   });
   return createHash("sha256").update(canonical ?? "null").digest("hex");
@@ -52,7 +59,7 @@ function nextPollDelayMs(): number {
  * Runs the operation and records its outcome in one transaction.
  *
  * The ownership re-check has to commit atomically with the operation's writes. A lease can
- * only tell you that a leader stopped *renewing*, never that it stopped *working* — so a
+ * only tell you that a leader stopped *renewing*, never that it stopped *working*, so a
  * merely slow leader can have its key stolen while its insert is still in flight. Fencing
  * the settle alone is not enough: it stops a stale leader recording a result but not from
  * committing its row. Load testing that version produced 28 duplicate products across 28
@@ -64,8 +71,15 @@ async function runAsLeader(
   operation: IdempotentOperation,
   coalesced: boolean,
 ): Promise<IdempotentResult | typeof LOST_LEASE> {
-  increment("leaderRequests");
   const connection = await pool.getConnection();
+
+  // The lease was taken before this connection was acquired, and under a burst that wait can
+  // consume most of it. Restart the clock now that the work can actually begin.
+  await keys.renewLease(pool, key, token, env.IDEMPOTENCY_LEASE_MS);
+
+  const heartbeat = setInterval(() => {
+    void keys.renewLease(pool, key, token, env.IDEMPOTENCY_LEASE_MS).catch(() => undefined);
+  }, Math.max(1, Math.floor(env.IDEMPOTENCY_LEASE_MS / 3)));
 
   try {
     await connection.beginTransaction();
@@ -98,8 +112,10 @@ async function runAsLeader(
     }
 
     await connection.commit();
+    increment("leaderExecutions");
     return { ...result, coalesced };
   } finally {
+    clearInterval(heartbeat);
     connection.release();
   }
 }
@@ -109,7 +125,7 @@ async function awaitOutcome(
   requestFingerprint: string,
   operation: IdempotentOperation,
 ): Promise<IdempotentResult> {
-  increment("waiterRequests");
+  increment("waiterCount");
   const startedAt = Date.now();
 
   try {
@@ -117,25 +133,26 @@ async function awaitOutcome(
       const record = await keys.find(pool, key);
 
       if (!record) {
-        // Retention cleanup removed the row mid-wait. Racing to re-claim is the only way
-        // forward; losing that race simply means someone else is now the leader.
-        const token = randomUUID();
+        // Retention cleanup removed the row mid-wait. No reaper runs today, so this is
+        // unreachable; it exists so that adding one cannot turn into a silent re-execution.
+        const reclaimToken = randomUUID();
         const retry = await keys.claimLeadership(
           pool,
           key,
           requestFingerprint,
-          token,
+          reclaimToken,
           env.IDEMPOTENCY_LEASE_MS,
           env.IDEMPOTENCY_TTL_HOURS,
         );
         if (retry === "leader") {
-          const result = await runAsLeader(key, token, operation, true);
+          const result = await runAsLeader(key, reclaimToken, operation, true);
           if (result !== LOST_LEASE) return result;
         }
       } else if (record.fingerprint !== requestFingerprint) {
         increment("fingerprintMismatches");
         throw new IdempotencyKeyReusedError();
       } else if (record.state === "completed") {
+        increment("coalescedResponses");
         return {
           status: record.responseStatus ?? 200,
           body: record.responseBody,
@@ -149,11 +166,11 @@ async function awaitOutcome(
         logger.warn({ key, error: record.errorMessage }, "waiter observed leader failure");
         throw new Error(record.errorMessage ?? "Leader request failed.");
       } else {
-        const token = randomUUID();
-        if (await keys.stealLeadership(pool, key, token, env.IDEMPOTENCY_LEASE_MS)) {
+        const stealToken = randomUUID();
+        if (await keys.stealLeadership(pool, key, stealToken, env.IDEMPOTENCY_LEASE_MS)) {
           increment("lockSteals");
           logger.warn({ key }, "lease expired, waiter took over");
-          const result = await runAsLeader(key, token, operation, true);
+          const result = await runAsLeader(key, stealToken, operation, true);
           if (result !== LOST_LEASE) return result;
         }
       }
@@ -176,34 +193,49 @@ async function awaitOutcome(
  *
  * The first caller to insert the key is the leader and does the work. Everyone else polls
  * the same row and returns whatever the leader recorded, so every caller gets an ordinary
- * response and no client needs conflict-handling logic.
+ * response and no client needs conflict-handling logic on the routine path.
  */
 export async function runIdempotent(
   key: string,
   requestBody: unknown,
   operation: IdempotentOperation,
 ): Promise<IdempotentResult> {
+  increment("requests");
   const requestFingerprint = fingerprint(requestBody);
-  const token = randomUUID();
+  const leaderToken = randomUUID();
 
   const role = await keys.claimLeadership(
     pool,
     key,
     requestFingerprint,
-    token,
+    leaderToken,
     env.IDEMPOTENCY_LEASE_MS,
     env.IDEMPOTENCY_TTL_HOURS,
   );
 
   if (role === "leader") {
-    const result = await runAsLeader(key, token, operation, false);
+    const result = await runAsLeader(key, leaderToken, operation, false);
     if (result !== LOST_LEASE) return result;
-  } else if (
-    // A previous attempt on this key failed. Exactly one of a racing set wins the takeover
-    // and re-runs it; the rest fall through to waiting.
-    await keys.reclaimFailed(pool, key, requestFingerprint, token, env.IDEMPOTENCY_LEASE_MS)
+    return awaitOutcome(key, requestFingerprint, operation);
+  }
+
+  // The key is taken. Inspect the row before touching it: a mismatched body is key reuse and
+  // must be rejected, never reclaimed. Checking inside the reclaim would silently overwrite
+  // the original fingerprint and run this body under someone else's key.
+  const existing = await keys.find(pool, key);
+
+  if (existing && existing.fingerprint !== requestFingerprint) {
+    increment("fingerprintMismatches");
+    throw new IdempotencyKeyReusedError();
+  }
+
+  // A previous attempt on this key failed. Exactly one of a racing set wins the takeover and
+  // re-runs it; the rest fall through to waiting.
+  if (
+    existing?.state === "failed" &&
+    (await keys.reclaimFailed(pool, key, requestFingerprint, leaderToken, env.IDEMPOTENCY_LEASE_MS))
   ) {
-    const result = await runAsLeader(key, token, operation, false);
+    const result = await runAsLeader(key, leaderToken, operation, false);
     if (result !== LOST_LEASE) return result;
   }
 

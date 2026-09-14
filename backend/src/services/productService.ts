@@ -1,10 +1,20 @@
 import { pool, type Queryable } from "../db/pool.js";
 import { NotFoundError, VersionConflictError } from "../domain/errors.js";
-import type { CreateProductInput, Product, UpdateProductInput } from "@warehouse/shared";
+import type {
+  CreateProductInput,
+  Page,
+  Product,
+  ProductQuery,
+  UpdateProductInput,
+} from "@warehouse/shared";
 import * as products from "../repositories/productRepository.js";
 
-export function listProducts(): Promise<Product[]> {
-  return products.findAll(pool);
+export async function listProducts(query: ProductQuery): Promise<Page<Product>> {
+  const [items, total] = await Promise.all([
+    products.findPage(pool, query.limit, query.offset),
+    products.count(pool),
+  ]);
+  return { items, total, limit: query.limit, offset: query.offset };
 }
 
 export async function getProduct(id: number): Promise<Product> {

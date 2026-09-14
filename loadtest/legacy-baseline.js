@@ -4,7 +4,7 @@ import { Counter } from "k6/metrics";
 
 // Same duplicate-burst workload as idempotency.js, aimed at the pre-revamp server. The
 // legacy POST has no Idempotency-Key, so the id in the body is the only thing identifying a
-// resubmit — exactly what a double-clicked form produced at `pre-revamp`.
+// resubmit, exactly what a double-clicked form produced at `pre-revamp`.
 
 const BASE = __ENV.BASE_URL || "http://localhost:3001";
 const DUPLICATES = Number(__ENV.DUPLICATES || 4);
@@ -14,7 +14,7 @@ const DURATION = __ENV.DURATION || "60s";
 const accepted = new Counter("legacy_201");
 const serverError = new Counter("legacy_500");
 const other = new Counter("legacy_other");
-// Status 0 means k6 never got an HTTP response at all — the connection was refused, reset
+// Status 0 means k6 never got an HTTP response at all: the connection was refused, reset
 // or timed out. Counted apart from 500 because it is a different failure: the client cannot
 // know whether the write landed.
 const transportFailure = new Counter("legacy_transport_failure");

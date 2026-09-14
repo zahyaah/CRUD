@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
+import type { RowDataPacket } from "mysql2/promise";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { pool } from "../db/pool.js";
 import { IdempotencyKeyReusedError } from "../domain/errors.js";
 import * as metrics from "../metrics.js";
 import * as keys from "../repositories/idempotencyRepository.js";
 import * as products from "../repositories/productRepository.js";
-import { type Executed, runIdempotent } from "./idempotencyService.js";
+import { type Executed, fingerprint, runIdempotent } from "./idempotencyService.js";
 
 const body = { name: "Widget", price: 19.99 };
 
@@ -51,8 +52,9 @@ describe("concurrent duplicate requests", () => {
     expect(results.filter((r) => r.coalesced)).toHaveLength(7);
 
     const snapshot = metrics.snapshot();
-    expect(snapshot.leaderRequests).toBe(1);
-    expect(snapshot.waiterRequests).toBe(7);
+    expect(snapshot.requests).toBe(8);
+    expect(snapshot.leaderExecutions).toBe(1);
+    expect(snapshot.coalescedResponses).toBe(7);
     expect(snapshot.dedupRate).toBeCloseTo(7 / 8);
   });
 
@@ -77,29 +79,43 @@ describe("concurrent duplicate requests", () => {
 });
 
 describe("leader crash and lock steal", () => {
-  it("lets a waiter take over when the leader's lease expires", async () => {
+  it("lets a waiter take over when a dead leader's lease expires", async () => {
     const key = uniqueKey();
-    let stalledStarted = false;
 
-    // Models a leader that claimed the key and then died: it never settles the row, so the
-    // lease is the only thing that can release the work.
-    const stalledLeader = runIdempotent(key, body, async () => {
-      stalledStarted = true;
-      await sleep(10_000);
-      return { status: 201, body: { marker: "never" }, resourceId: 1 };
-    });
-
-    while (!stalledStarted) await sleep(5);
+    // A process that claimed the key and died: the row exists, nothing renews its lease, and
+    // nothing will ever settle it. Claiming through the repository rather than the service is
+    // what makes it dead, because no heartbeat is started.
+    await keys.claimLeadership(pool, key, fingerprint(body), randomUUID(), 1, 24);
+    await sleep(30);
 
     const takeover = await runIdempotent(key, body, succeeds(2, "stole-it"));
 
     expect(takeover.body).toEqual({ marker: "stole-it" });
     expect(metrics.snapshot().lockSteals).toBe(1);
+    expect((await keys.find(pool, key))?.state).toBe("completed");
+  });
 
-    const record = await keys.find(pool, key);
-    expect(record?.state).toBe("completed");
+  it("does not steal from a leader that is slow but alive", async () => {
+    const key = uniqueKey();
+    let started = false;
 
-    void stalledLeader.catch(() => undefined);
+    // Runs far longer than the 150ms test lease. The heartbeat keeps renewing, so the lease
+    // stays valid and no waiter takes over. Without renewal this livelocks: every replacement
+    // leader is slow too, so each one is stolen from and rolled back in turn.
+    const slowLeader = runIdempotent(key, body, async () => {
+      started = true;
+      await sleep(700);
+      return { status: 201, body: { marker: "finished" }, resourceId: 20 };
+    });
+
+    while (!started) await sleep(5);
+    const waiter = runIdempotent(key, body, succeeds(21, "should-not-run"));
+
+    expect((await slowLeader).body).toEqual({ marker: "finished" });
+    expect((await waiter).body).toEqual({ marker: "finished" });
+    expect(metrics.snapshot().lockSteals).toBe(0);
+    expect(metrics.snapshot().fencedRollbacks).toBe(0);
+    expect(metrics.snapshot().leaderExecutions).toBe(1);
   });
 
   it("rolls back a stale leader's writes rather than duplicating the row", async () => {
@@ -118,31 +134,43 @@ describe("leader crash and lock steal", () => {
       rating: 3,
     };
 
-    let leaderInserted = false;
-    const slowLeader = runIdempotent(key, body, async (tx) => {
+    let takenOver: Promise<unknown> | null = null;
+
+    const displacedLeader = await runIdempotent(key, body, async (tx) => {
       const product = await products.insert(tx, fields);
-      leaderInserted = true;
-      await sleep(600); // outlives the 150ms lease
+
+      // Simulate another node winning the key while this leader's insert is uncommitted.
+      // Rewriting leader_token directly is deterministic, where racing a real lease would
+      // depend on timing; the leader now cannot satisfy its own fencing check.
+      await pool.execute("UPDATE idempotency_key SET leader_token = ? WHERE idempotency_key = ?", [
+        randomUUID(),
+        key,
+      ]);
+      takenOver = keys.settle(pool, key, (await keys.find(pool, key))!.leaderToken, {
+        state: "completed",
+        status: 201,
+        body: { marker: "other-node" },
+        resourceId: 999,
+      });
+
       return { status: 201, body: product, resourceId: product.id };
     });
 
-    while (!leaderInserted) await sleep(5);
-    await sleep(200); // let the lease lapse
+    await takenOver;
 
-    const takeover = await runIdempotent(key, body, async (tx) => {
-      const product = await products.insert(tx, fields);
-      return { status: 201, body: product, resourceId: product.id };
-    });
-
-    // The displaced leader does not fail — it discovers the outcome and returns it.
-    const displaced = await slowLeader;
-
-    expect(metrics.snapshot().lockSteals).toBe(1);
+    // The displaced leader does not fail. It discovers the winner's outcome and returns it.
     expect(metrics.snapshot().fencedRollbacks).toBe(1);
-    expect(displaced.resourceId).toBe(takeover.resourceId);
+    expect(metrics.snapshot().leaderExecutions).toBe(0);
+    expect(displacedLeader.body).toEqual({ marker: "other-node" });
+    expect(displacedLeader.coalesced).toBe(true);
 
-    const all = await products.findAll(pool);
-    expect(all.filter((p) => p.name === name)).toHaveLength(1);
+    // The rolled-back insert left nothing behind. Before the fix it committed anyway, which
+    // is what produced 28 duplicate products under load.
+    const [rows] = await pool.query<(RowDataPacket & { total: number })[]>(
+      "SELECT COUNT(*) AS total FROM product WHERE name = ?",
+      [name],
+    );
+    expect(rows[0]?.total).toBe(0);
   });
 
   it("refuses a revived leader's result once its lease was stolen", async () => {
@@ -213,6 +241,41 @@ describe("key reuse", () => {
     await expect(
       runIdempotent(key, { name: "Different", price: 1 }, succeeds(5)),
     ).rejects.toBeInstanceOf(IdempotencyKeyReusedError);
+  });
+
+  it("rejects a different body on a key whose previous attempt failed", async () => {
+    // Regression test. Reclaiming a failed key used to match on state alone and overwrite the
+    // stored fingerprint, so an unrelated body could take over someone else's key.
+    const key = uniqueKey();
+
+    await expect(
+      runIdempotent(key, body, async () => {
+        throw new Error("transient");
+      }),
+    ).rejects.toThrow("transient");
+
+    await expect(
+      runIdempotent(key, { name: "Totally different", price: 1 }, succeeds(11)),
+    ).rejects.toBeInstanceOf(IdempotencyKeyReusedError);
+
+    // The original fingerprint survived, so the legitimate retry still works.
+    const retry = await runIdempotent(key, body, succeeds(12, "recovered"));
+    expect(retry.body).toEqual({ marker: "recovered" });
+  });
+
+  it("treats keys differing only by case as distinct", async () => {
+    // Regression test. utf8mb4's default collation is case-insensitive, which would merge
+    // these two keys into one and silently skip the second create.
+    const base = uniqueKey();
+    const lower = `${base}-abc`;
+    const upper = `${base}-ABC`;
+
+    const first = await runIdempotent(lower, body, succeeds(13, "lower"));
+    const second = await runIdempotent(upper, body, succeeds(14, "upper"));
+
+    expect(first.body).toEqual({ marker: "lower" });
+    expect(second.body).toEqual({ marker: "upper" });
+    expect(second.coalesced).toBe(false);
   });
 
   it("treats key order in the body as insignificant", async () => {

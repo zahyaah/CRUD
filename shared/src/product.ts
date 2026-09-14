@@ -46,6 +46,24 @@ export const updateProductInput = productFields.extend({
 
 export const productIdParam = z.coerce.number().int().positive();
 
+/**
+ * Bounded by default and hard-capped, so a client cannot ask the server to materialise the
+ * whole table in one response.
+ */
+export const productQuery = z.object({
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
+
+export type ProductQuery = z.infer<typeof productQuery>;
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export type ProductFields = z.infer<typeof productFields>;
 export type CreateProductInput = z.infer<typeof createProductInput>;
 export type UpdateProductInput = z.infer<typeof updateProductInput>;

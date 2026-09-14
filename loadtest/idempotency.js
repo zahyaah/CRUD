@@ -32,10 +32,11 @@ export const options = {
     },
   },
   thresholds: {
-    // A duplicate that slips through and creates a second row is a correctness failure, so
-    // this threshold aborts the run rather than reporting a pretty latency number.
-    idem_unexpected: ["count==0"],
-    http_req_failed: ["rate<0.01"],
+    // A duplicate that slips through is a correctness failure, so abort the run rather than
+    // finish it and report a pretty latency number. abortOnFail is what actually stops it;
+    // a bare threshold only marks the run failed at the end.
+    idem_unexpected: [{ threshold: "count==0", abortOnFail: true }],
+    http_req_failed: [{ threshold: "rate==0", abortOnFail: false }],
   },
 };
 
@@ -45,12 +46,14 @@ export function setup() {
 
 export default function (data) {
   // Consecutive iterations share a key, so each group of DUPLICATES requests is a burst of
-  // concurrent retries of the same logical create — a double-clicked submit button.
+  // concurrent retries of the same logical create: a double-clicked submit button.
   const group = Math.floor(exec.scenario.iterationInTest / DUPLICATES);
   const key = `k6-${data.runId}-${group}`;
 
   const payload = JSON.stringify({
-    name: `Load Widget ${group}`,
+    // The run id is part of the name so that `COUNT(*) - COUNT(DISTINCT name)` stays a valid
+    // duplicate check across runs without truncating the table first.
+    name: `Load Widget ${data.runId}-${group}`,
     description: "Created by the k6 duplicate-burst scenario",
     price: 19.99,
     category: "loadtest",
@@ -97,11 +100,18 @@ export function handleSummary(summary) {
     httpFailureRate: value("http_req_failed", "rate"),
   };
 
+  // Not a finding: DUPLICATES fixes this ratio by construction (4 duplicates per key means
+  // 75% of requests are duplicates). It is here to confirm the workload was generated as
+  // intended, not to describe how well the service deduplicates.
   const total = result.outcomes.created + result.outcomes.coalesced;
-  result.dedupRate = total > 0 ? result.outcomes.coalesced / total : 0;
+  result.injectedDuplicateRatio = total > 0 ? result.outcomes.coalesced / total : 0;
+  result.expectedUniqueKeys = Math.ceil(result.totalRequests / DUPLICATES);
+  result.note =
+    "Row counts are not measured here: k6 cannot query MySQL. Verify with " +
+    "SELECT COUNT(*), COUNT(DISTINCT name) FROM product after the run.";
 
   return {
     stdout: `\n${JSON.stringify(result, null, 2)}\n`,
-    "loadtest/results/idempotency.json": JSON.stringify(result, null, 2),
+    [`loadtest/results/idempotency-${RUN}.json`]: JSON.stringify(result, null, 2),
   };
 }

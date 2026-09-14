@@ -1,0 +1,25 @@
+{
+  "runId": "v2r1",
+  "config": {
+    "rate": 400,
+    "duration": "60s",
+    "duplicatesPerKey": 4
+  },
+  "throughputRps": 399.78108757383416,
+  "totalRequests": 23995,
+  "latencyMs": {
+    "p50": 4.33,
+    "p95": 21.656299999999998,
+    "p99": 29.898739999999993,
+    "max": 321.322
+  },
+  "outcomes": {
+    "created": 5999,
+    "coalesced": 17996,
+    "unexpected": 0
+  },
+  "httpFailureRate": 0,
+  "injectedDuplicateRatio": 0.7499895811627423,
+  "expectedUniqueKeys": 5999,
+  "note": "Row counts are not measured here: k6 cannot query MySQL. Verify with SELECT COUNT(*), COUNT(DISTINCT name) FROM product after the run."
+}

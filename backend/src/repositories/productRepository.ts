@@ -58,9 +58,19 @@ function toColumnValues(fields: ProductFields): (string | number)[] {
   ];
 }
 
-export async function findAll(db: Queryable): Promise<Product[]> {
-  const [rows] = await db.query<ProductRow[]>(`SELECT ${COLUMNS} FROM product ORDER BY id`);
+export async function findPage(db: Queryable, limit: number, offset: number): Promise<Product[]> {
+  const [rows] = await db.query<ProductRow[]>(
+    `SELECT ${COLUMNS} FROM product ORDER BY id LIMIT ? OFFSET ?`,
+    [limit, offset],
+  );
   return rows.map(toProduct);
+}
+
+export async function count(db: Queryable): Promise<number> {
+  const [rows] = await db.query<(RowDataPacket & { total: number })[]>(
+    "SELECT COUNT(*) AS total FROM product",
+  );
+  return rows[0]?.total ?? 0;
 }
 
 export async function findById(db: Queryable, id: number): Promise<Product | null> {

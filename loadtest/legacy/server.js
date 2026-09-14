@@ -20,7 +20,7 @@ app.use(express.static(path.join(__dirname, "../frontend")))
 // database connection
 // ONLY modification to the pre-revamp source: the original hardcoded no port, so it could
 // reach nothing but a MySQL on the default 3306. The baseline container publishes 3307.
-// Connection strategy is untouched — still one connection, still no pool.
+// Connection strategy is untouched: still one connection, still no pool.
 const connection = mysql.createConnection({
     user: USER,
     host: HOST,

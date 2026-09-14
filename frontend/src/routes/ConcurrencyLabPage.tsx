@@ -1,6 +1,7 @@
 import type { CreateProductInput } from "@warehouse/shared";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { countProducts } from "../api/client";
 
 interface Attempt {
   index: number;
@@ -27,12 +28,6 @@ function sampleProduct(label: string): CreateProductInput {
     releaseDate: "2024-06-01",
     rating: 4.2,
   };
-}
-
-async function countProducts(): Promise<number> {
-  const response = await fetch("/products");
-  const rows: unknown = await response.json();
-  return Array.isArray(rows) ? rows.length : 0;
 }
 
 /**
@@ -91,7 +86,7 @@ export function ConcurrencyLabPage() {
       <header className="page-head">
         <h1 className="page-head__title">Concurrency lab</h1>
         <p className="page-head__sub">
-          Fires simultaneous identical creates sharing one <code>Idempotency-Key</code> — a
+          Fires simultaneous identical creates sharing one <code>Idempotency-Key</code>: a
           double-clicked submit, exaggerated. However many go out, one product comes back.
         </p>
       </header>

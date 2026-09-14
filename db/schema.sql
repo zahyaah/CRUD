@@ -38,7 +38,11 @@ CREATE INDEX idx_product_category ON product (category);
 -- without them coordinating. The winner is the leader and runs the pipeline; the losers
 -- become waiters and poll this row for the leader's outcome.
 CREATE TABLE idempotency_key (
-    idempotency_key VARCHAR(255) NOT NULL,
+    -- utf8mb4's default collation on MySQL 8 is accent- and case-insensitive, which would
+    -- make "AbC" and "abc" the same primary key. Idempotency keys are opaque byte strings
+    -- (base64, ULIDs, UUIDs), so two distinct keys colliding would silently merge two
+    -- unrelated creates into one. Binary collation compares them exactly.
+    idempotency_key VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
 
     -- Fingerprint of the request body. A key replayed with a *different* payload is a
     -- client bug, not a retry, and must be rejected rather than served the cached response.

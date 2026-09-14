@@ -26,8 +26,8 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  // Anything reaching here is unclassified, so the cause is logged but never returned —
-  // at `pre-revamp` every failure collapsed into the same opaque 500 (server.js:46, :61,
+  // Anything reaching here is unclassified, so the cause is logged but never returned.
+  // At `pre-revamp` every failure collapsed into the same opaque 500 (server.js:46, :61,
   // :81, :99, :114) and the real reason was lost entirely.
   logger.error({ err }, "unhandled error");
   res.status(500).json({ error: { code: "INTERNAL", message: "Internal server error." } });

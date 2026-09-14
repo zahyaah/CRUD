@@ -1,27 +1,36 @@
 import { Router } from "express";
 import { AppError } from "../../domain/errors.js";
-import { createProductInput, productIdParam, updateProductInput } from "@warehouse/shared";
+import {
+  createProductInput,
+  productIdParam,
+  productQuery,
+  updateProductInput,
+} from "@warehouse/shared";
 import { runIdempotent } from "../../services/idempotencyService.js";
 import * as service from "../../services/productService.js";
 
 export const productRoutes: Router = Router();
 
 function idempotencyKeyFrom(header: unknown): string {
-  if (typeof header !== "string" || header.trim().length === 0) {
+  // Returns the trimmed value, not the raw one: validating the trimmed form and then keying
+  // on the original would make "abc " and "abc" two keys, and two creates.
+  const key = typeof header === "string" ? header.trim() : "";
+
+  if (key.length === 0) {
     throw new AppError(
       "IDEMPOTENCY_KEY_REQUIRED",
       400,
       "POST /products requires an Idempotency-Key header.",
     );
   }
-  if (header.length > 255) {
+  if (key.length > 255) {
     throw new AppError("VALIDATION_FAILED", 400, "Idempotency-Key must be at most 255 characters.");
   }
-  return header;
+  return key;
 }
 
-productRoutes.get("/", async (_req, res) => {
-  res.json(await service.listProducts());
+productRoutes.get("/", async (req, res) => {
+  res.json(await service.listProducts(productQuery.parse(req.query)));
 });
 
 productRoutes.get("/:id", async (req, res) => {

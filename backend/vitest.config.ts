@@ -3,8 +3,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     // Tests run against the real MySQL from db/docker-compose.yml. Mocking the driver would
-    // defeat the purpose: every guarantee under test is enforced by the database — the
-    // PRIMARY KEY race, the lease predicate in the UPDATE's WHERE clause — not by this code.
+    // defeat the purpose: every guarantee under test is enforced by the database (the
+    // PRIMARY KEY race, the lease predicate in the UPDATE's WHERE clause), not by this code.
     env: {
       DB_HOST: "127.0.0.1",
       DB_PORT: "3307",
