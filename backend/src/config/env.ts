@@ -31,6 +31,20 @@ const envSchema = z.object({
   // free: the displaced leader's work is rolled back and redone.
   IDEMPOTENCY_LEASE_MS: z.coerce.number().int().positive().default(800),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+
+  /**
+   * Comma-separated browser origins allowed to call this API. Empty means same-origin only,
+   * which is correct in development, where Vite proxies the API under its own origin.
+   */
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .default("")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -1,7 +1,7 @@
 import type { CreateProductInput } from "@warehouse/shared";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { countProducts } from "../api/client";
+import { apiUrl, countProducts } from "../api/client";
 
 interface Attempt {
   index: number;
@@ -36,7 +36,7 @@ function sampleProduct(label: string): CreateProductInput {
  */
 async function fire(key: string, body: CreateProductInput, index: number): Promise<Attempt> {
   const startedAt = performance.now();
-  const response = await fetch("/products", {
+  const response = await fetch(apiUrl("/products"), {
     method: "POST",
     headers: { "Content-Type": "application/json", "Idempotency-Key": key },
     body: JSON.stringify(body),

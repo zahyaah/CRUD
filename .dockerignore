@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.env
+interview-prep
+frontend/src
+frontend/index.html
+frontend/vite.config.ts
+loadtest
+docs
+db
+*.md

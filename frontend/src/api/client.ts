@@ -25,8 +25,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Empty in development and for a single-origin deployment, so paths stay relative and no
+ * preflight is triggered. Set to the API's origin when the UI is hosted separately.
+ */
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });

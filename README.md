@@ -104,6 +104,43 @@ Everything, including the runs that went badly, is in
 measured on one laptop running k6, the API and MySQL together, so treat it as a comparison
 between two designs rather than a capacity figure.
 
+## Deploying
+
+Three free tiers: Vercel for the UI, Render for the API, Aiven for MySQL. The API needs a
+long-lived process, so serverless is the wrong host for it: waiters poll for up to two seconds
+and a leader heartbeats its lease on a timer, neither of which survives a frozen process.
+
+The two URLs depend on each other, so the order matters.
+
+**1. Database.** Create a free MySQL service on Aiven. It powers off when idle and needs no
+card. Load the schema, substituting the connection details it gives you:
+
+```bash
+mysql -h <host> -P <port> -u avnadmin -p --ssl-mode=REQUIRED defaultdb < db/schema.sql
+```
+
+**2. API.** Point Render at this repository. It reads `render.yaml` and builds the Dockerfile;
+set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` in the dashboard from Aiven's
+details. Leave `CORS_ALLOWED_ORIGINS` empty for now. Note the URL it gives you.
+
+**3. UI.** Point Vercel at the same repository. It reads `vercel.json`, which builds the shared
+contract before the frontend and rewrites deep links to `index.html`. Set `VITE_API_URL` to the
+Render URL from step 2.
+
+**4. Close the loop.** Set `CORS_ALLOWED_ORIGINS` on Render to the Vercel URL, exactly, with no
+trailing slash. Until this is done every write fails preflight, because `Idempotency-Key` is
+not a header the browser sends cross-origin without permission.
+
+Both free tiers sleep when idle, so the first request after a quiet period is slow. Keep
+`DB_POOL_SIZE` modest: Aiven's free plan allows far fewer connections than the local default.
+
+To run the API container locally the way Render will:
+
+```bash
+docker build -t warehouse-api .
+docker run -p 3000:3000 --env-file backend/.env warehouse-api
+```
+
 ## Decisions
 
 | ADR | Decision |
