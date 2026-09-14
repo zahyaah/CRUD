@@ -1,14 +1,17 @@
 # Debugging notes
 
-Nine bugs found during the revamp. Three were in the original code and six were mine. Four of
-mine were found by an adversarial reviewer reading the code cold, against the contract, with no
-access to my reasoning.
+Sixteen bugs found during the revamp. Two came from the original code and fourteen were mine.
+
+Eleven of mine were found by review rather than by testing: one pass reading the concurrency
+design cold against a written contract, a second reading the whole diff. Most had no symptom and
+no failing test. Every defect a test could catch, the tests caught; the rest needed someone
+reading for what the code does rather than what it was meant to do.
 
 ---
 
 ## 1. Duplicate rows from lease-based takeover
 
-**Mine. The most serious of the nine.**
+**Mine. The most serious of those with a symptom.**
 
 **Symptom.** A 60-second load run at 400 rps produced 5,813 product rows against 5,785
 idempotency keys. The gap of 28 matched the run's 28 lock steals exactly.
@@ -227,3 +230,48 @@ rather than the system.
 **Worth keeping.** The reviewer could not distinguish a transcribed measurement from a
 fabricated one, and neither could a reader. Unprovenanced numbers are worth roughly what
 invented ones are.
+
+---
+
+## 10. A deadlock the load tests could not reach
+
+**Mine. Found by a review of the whole diff.**
+
+**Symptom.** None. Six 60-second runs at 400 rps passed with zero duplicates and no timeouts.
+
+**Root cause.** A leader checks out a connection from the main pool for its transaction, then
+issues its lease renewals against that same pool. Once concurrent leaders reach the pool size,
+every renewal queues behind connections held by the very transactions waiting on those
+renewals. `queueLimit: 0` means no bound and no acquire timeout, so nothing releases and
+`connection.release()` is never reached. The process stops answering entirely, `/health`
+included.
+
+**Why load testing missed it.** At 400 rps against operations finishing in single-digit
+milliseconds, only two or three leaders are in flight at once against a pool of a hundred.
+Reaching saturation needs a burst or a slow database, and the workload was built to prove
+correctness under duplicates rather than to exhaust the pool.
+
+**Fix.** Renewals run on a dedicated `leasePool`. They cannot share the transaction's
+connection either: a renewal inside an uncommitted transaction is invisible to every other
+process, which is the one thing it exists to do.
+
+**Guard.** None yet. Reproducing it means driving the pool to saturation, which the current
+single-machine rig cannot do. That is the most valuable test still missing.
+
+---
+
+## Also found in that pass
+
+- `Date.parse` accepts impossible calendar dates and rolls them forward, so 29 February in a
+  non-leap year passed validation and then failed in MySQL strict mode. A bad request reached
+  the client as a server error.
+- The edit form seeded its draft once and was not keyed by row, so opening a second product
+  without cancelling kept the first one's values and would save them under the second one's id.
+- The idempotency key rotated only after a successful create, so correcting a rejected form and
+  resubmitting sent a new body under the old key, which is key reuse and is refused permanently.
+- A lease steal reported itself as a coalesced response, so a request that had done the work
+  claimed it had not, and the load test's execution count drifted below the truth.
+- Malformed JSON and oversized bodies matched no typed error, so they were logged as unhandled
+  faults and answered with 500 instead of 400 or 413.
+- A leader's typed error was flattened to a bare one before reaching its waiters, so coalesced
+  callers could receive a 500 where the leader's own client got a 4xx.
