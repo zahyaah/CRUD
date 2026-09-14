@@ -3,6 +3,20 @@ import { ZodError } from "zod";
 import { AppError } from "../domain/errors.js";
 import { logger } from "../logger.js";
 
+interface BodyParserError extends Error {
+  status: number;
+  type: string;
+}
+
+function isBodyParserError(err: unknown): err is BodyParserError {
+  return (
+    err instanceof Error &&
+    "type" in err &&
+    typeof (err as { type: unknown }).type === "string" &&
+    (err as { type: string }).type.startsWith("entity.")
+  );
+}
+
 export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: `No route for ${req.method} ${req.path}` } });
 };
@@ -14,6 +28,23 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
         code: "VALIDATION_FAILED",
         message: "Request body failed validation.",
         details: err.issues.map((i) => ({ field: i.path.join("."), message: i.message })),
+      },
+    });
+    return;
+  }
+
+  // body-parser rejections carry `type` and a status. Without this they reach the catch-all
+  // below, so a malformed body or an oversized payload is logged as an unhandled server fault
+  // and answered with 500 rather than 400 or 413.
+  if (err instanceof SyntaxError || isBodyParserError(err)) {
+    const status = isBodyParserError(err) ? err.status : 400;
+    res.status(status).json({
+      error: {
+        code: status === 413 ? "PAYLOAD_TOO_LARGE" : "MALFORMED_BODY",
+        message:
+          status === 413
+            ? "Request body exceeds the 1mb limit."
+            : "Request body is not valid JSON.",
       },
     });
     return;

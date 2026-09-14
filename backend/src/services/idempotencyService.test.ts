@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { RowDataPacket } from "mysql2/promise";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { pool } from "../db/pool.js";
+import { leasePool, pool } from "../db/pool.js";
 import { IdempotencyKeyReusedError } from "../domain/errors.js";
 import * as metrics from "../metrics.js";
 import * as keys from "../repositories/idempotencyRepository.js";
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await Promise.all([pool.end(), leasePool.end()]);
 });
 
 describe("concurrent duplicate requests", () => {
@@ -91,7 +91,10 @@ describe("leader crash and lock steal", () => {
     const takeover = await runIdempotent(key, body, succeeds(2, "stole-it"));
 
     expect(takeover.body).toEqual({ marker: "stole-it" });
+    // It ran the work, so it must not report itself as coalesced.
+    expect(takeover.coalesced).toBe(false);
     expect(metrics.snapshot().lockSteals).toBe(1);
+    expect(metrics.snapshot().leaderExecutions).toBe(1);
     expect((await keys.find(pool, key))?.state).toBe("completed");
   });
 

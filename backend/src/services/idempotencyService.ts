@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { PoolConnection } from "mysql2/promise";
 import { env } from "../config/env.js";
-import { pool } from "../db/pool.js";
-import { CoalesceTimeoutError, IdempotencyKeyReusedError } from "../domain/errors.js";
+import { leasePool, pool } from "../db/pool.js";
+import { AppError, CoalesceTimeoutError, IdempotencyKeyReusedError } from "../domain/errors.js";
 import { logger } from "../logger.js";
 import { increment } from "../metrics.js";
 import * as keys from "../repositories/idempotencyRepository.js";
@@ -73,12 +73,17 @@ async function runAsLeader(
 ): Promise<IdempotentResult | typeof LOST_LEASE> {
   const connection = await pool.getConnection();
 
+  // Renewals run on leasePool, never on `pool` or on `connection`. Not `connection`, because a
+  // renewal inside the uncommitted transaction is invisible to every other process, which is
+  // the one thing it exists to avoid. Not `pool`, because this leader is holding one of its
+  // connections and would queue behind itself.
+  //
   // The lease was taken before this connection was acquired, and under a burst that wait can
-  // consume most of it. Restart the clock now that the work can actually begin.
-  await keys.renewLease(pool, key, token, env.IDEMPOTENCY_LEASE_MS);
+  // consume most of it, so restart the clock now that the work can actually begin.
+  await keys.renewLease(leasePool, key, token, env.IDEMPOTENCY_LEASE_MS);
 
   const heartbeat = setInterval(() => {
-    void keys.renewLease(pool, key, token, env.IDEMPOTENCY_LEASE_MS).catch(() => undefined);
+    void keys.renewLease(leasePool, key, token, env.IDEMPOTENCY_LEASE_MS).catch(() => undefined);
   }, Math.max(1, Math.floor(env.IDEMPOTENCY_LEASE_MS / 3)));
 
   try {
@@ -90,8 +95,9 @@ async function runAsLeader(
     } catch (error) {
       await connection.rollback();
       increment("leaderFailures");
-      await keys.settle(pool, key, token, {
+      await keys.settle(leasePool, key, token, {
         state: "failed",
+        status: error instanceof AppError ? error.status : 500,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -145,7 +151,8 @@ async function awaitOutcome(
           env.IDEMPOTENCY_TTL_HOURS,
         );
         if (retry === "leader") {
-          const result = await runAsLeader(key, reclaimToken, operation, true);
+          // This caller performs the work, so it is not a coalesced response.
+          const result = await runAsLeader(key, reclaimToken, operation, false);
           if (result !== LOST_LEASE) return result;
         }
       } else if (record.fingerprint !== requestFingerprint) {
@@ -161,16 +168,21 @@ async function awaitOutcome(
         };
       } else if (record.state === "failed") {
         // Surface the leader's failure rather than making every waiter burn the full
-        // budget. The message is logged, never returned, so a waiter's client sees exactly
-        // the generic 500 the leader's client saw.
+        // budget, reproducing the status the leader's own client received. The recorded
+        // message is logged and never returned, so a waiter learns no more than the leader did.
         logger.warn({ key, error: record.errorMessage }, "waiter observed leader failure");
-        throw new Error(record.errorMessage ?? "Leader request failed.");
+        const status = record.responseStatus ?? 500;
+        if (status === 500) throw new Error(record.errorMessage ?? "Leader request failed.");
+        throw new AppError("INTERNAL", status, "The original request for this key failed.");
       } else {
         const stealToken = randomUUID();
         if (await keys.stealLeadership(pool, key, stealToken, env.IDEMPOTENCY_LEASE_MS)) {
           increment("lockSteals");
           logger.warn({ key }, "lease expired, waiter took over");
-          const result = await runAsLeader(key, stealToken, operation, true);
+          // Took the work over and ran it, so this response is not coalesced. Reporting it as
+          // coalesced left a steal with no caller claiming the execution, which made the
+          // load test's created count drift below the true number of executions.
+          const result = await runAsLeader(key, stealToken, operation, false);
           if (result !== LOST_LEASE) return result;
         }
       }

@@ -10,7 +10,20 @@ import { z } from "zod";
 const calendarDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "must be formatted YYYY-MM-DD")
-  .refine((value) => !Number.isNaN(Date.parse(value)), "is not a real calendar date");
+  /**
+   * Round-trips the parts rather than trusting `Date.parse`, which rolls impossible dates
+   * forward instead of rejecting them: it reads "2023-02-29" as 1 March. Those used to pass
+   * validation and then fail in MySQL strict mode, turning a bad request into a 500.
+   */
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    );
+  }, "is not a real calendar date");
 
 const money = z
   .number()

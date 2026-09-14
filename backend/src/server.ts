@@ -1,6 +1,6 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
-import { pool } from "./db/pool.js";
+import { leasePool, pool } from "./db/pool.js";
 import { logger } from "./logger.js";
 
 const server = createApp().listen(env.PORT, () => {
@@ -10,7 +10,7 @@ const server = createApp().listen(env.PORT, () => {
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "shutting down");
   server.close();
-  await pool.end();
+  await Promise.all([pool.end(), leasePool.end()]);
   process.exit(0);
 }
 

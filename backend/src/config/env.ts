@@ -8,6 +8,10 @@ const envSchema = z.object({
   DB_PASSWORD: z.string(),
   DB_NAME: z.string().min(1),
   DB_POOL_SIZE: z.coerce.number().int().positive().max(200).default(20),
+
+  // Reserved for lease renewals, which must not queue behind the transactions they supervise.
+  // Small on purpose: these are single short statements, never held across work.
+  DB_LEASE_POOL_SIZE: z.coerce.number().int().positive().max(50).default(5),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().positive().default(24),
 
   // Measured, not guessed. A sweep at 400 rps put p99 at 386ms with a 4ms poll, 71ms at

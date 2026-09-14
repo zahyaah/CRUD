@@ -123,7 +123,7 @@ export async function reclaimFailed(
     `UPDATE idempotency_key
         SET state = 'processing', leader_token = ?,
             lease_expires_at = DATE_ADD(NOW(3), INTERVAL ? MICROSECOND),
-            error_message = NULL, completed_at = NULL
+            response_status = NULL, error_message = NULL, completed_at = NULL
       WHERE idempotency_key = ? AND state = 'failed' AND request_fingerprint = ?`,
     [leaderToken, leaseMs * MICROS_PER_MS, key, fingerprint],
   );
@@ -165,7 +165,7 @@ export async function settle(
   leaderToken: string,
   outcome:
     | { state: "completed"; status: number; body: unknown; resourceId: number | null }
-    | { state: "failed"; errorMessage: string },
+    | { state: "failed"; status: number; errorMessage: string },
 ): Promise<boolean> {
   const [result] =
     outcome.state === "completed"
@@ -178,9 +178,10 @@ export async function settle(
         )
       : await db.execute<ResultSetHeader>(
           `UPDATE idempotency_key
-              SET state = 'failed', error_message = ?, completed_at = NOW(3)
+              SET state = 'failed', response_status = ?, error_message = ?,
+                  completed_at = NOW(3)
             WHERE idempotency_key = ? AND leader_token = ?`,
-          [outcome.errorMessage.slice(0, 1024), key, leaderToken],
+          [outcome.status, outcome.errorMessage.slice(0, 1024), key, leaderToken],
         );
 
   return result.affectedRows === 1;

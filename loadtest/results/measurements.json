@@ -1,14 +1,13 @@
 {
   "capturedOn": "2026-09-14",
-
   "provenance": {
     "latencyAndThroughput": "Emitted by loadtest/idempotency.js handleSummary from k6's own metrics.",
     "outcomeCounts": "Emitted by the same script from the Idempotent-Coalesced response header.",
     "rowCounts": "NOT measured by k6, which cannot query MySQL. Collected by running SELECT COUNT(*), COUNT(DISTINCT name) FROM warehouse.product against the container after each run, and transcribed here.",
     "serviceCounters": "Read from GET /metrics after each run. These are cumulative per process, not per run, so the final entry is the total across all six.",
-    "tablesTruncated": "product and idempotency_key were truncated before every run."
+    "tablesTruncated": "product and idempotency_key were truncated before every run.",
+    "rawRunFiles": "The six runs under current.runs are transcribed from idempotency-v2r1.json through idempotency-v2r6.json in this directory, written by the k6 script itself. Row counts are the exception and were collected by SQL, as noted above."
   },
-
   "harness": {
     "k6": "v2.2.0 (go1.26.5, darwin/arm64)",
     "node": "v23.10.0",
@@ -18,20 +17,92 @@
     "caveat": "Comparative numbers between designs on identical hardware, not capacity figures for any of them. Tail latency here is contended by the load generator sharing a machine with the database.",
     "workload": "constant-arrival-rate POST /products at 400 rps for 60s; every 4 consecutive iterations share one Idempotency-Key, simulating a double-clicked submit."
   },
-
   "workloadCaveat": "DUPLICATES=4 makes 75% of requests duplicates by construction. Any '75%' figure below describes the injected workload, not something the system discovered. What the system determines is what happens to those duplicates.",
-
   "current": {
     "design": "Coalescing with lease renewal and transactional fencing. Duplicates wait for the leader and receive its recorded response; 409 is not in the contract.",
     "runs": [
-      { "run": 1, "achievedRps": 399.8, "p50": 4.33, "p95": 21.66, "p99": 29.90,  "max": 321.3, "created": 5999, "coalesced": 17996, "unexpected": 0, "expectedUniqueKeys": 5999, "dbRows": 5999, "duplicateRows": 0 },
-      { "run": 2, "achievedRps": 399.9, "p50": 4.14, "p95": 21.19, "p99": 23.62,  "max": 49.1,  "created": 6000, "coalesced": 18000, "unexpected": 0, "expectedUniqueKeys": 6000, "dbRows": 6000, "duplicateRows": 0 },
-      { "run": 3, "achievedRps": 397.5, "p50": 4.22, "p95": 22.39, "p99": 58.89,  "max": 750.9, "created": 5964, "coalesced": 17891, "unexpected": 0, "expectedUniqueKeys": 5964, "dbRows": 5964, "duplicateRows": 0 },
-      { "run": 4, "achievedRps": 399.7, "p50": 4.30, "p95": 23.14, "p99": 114.35, "max": 296.7, "created": 5998, "unexpected": 0, "expectedUniqueKeys": 5998, "dbRows": 5998, "duplicateRows": 0 },
-      { "run": 5, "achievedRps": 397.9, "p50": 5.52, "p95": 110.54, "p99": 394.89, "max": 887.0, "created": 5970, "unexpected": 0, "expectedUniqueKeys": 5970, "dbRows": 5970, "duplicateRows": 0 },
-      { "run": 6, "achievedRps": 399.4, "p50": 4.47, "p95": 27.40, "p99": 147.66, "max": 354.0, "created": 5993, "unexpected": 0, "expectedUniqueKeys": 5993, "dbRows": 5993, "duplicateRows": 0 }
+      {
+        "run": 1,
+        "achievedRps": 399.8,
+        "p50": 4.33,
+        "p95": 21.66,
+        "p99": 29.9,
+        "max": 321.3,
+        "created": 5999,
+        "coalesced": 17996,
+        "unexpected": 0,
+        "expectedUniqueKeys": 5999,
+        "dbRows": 5999,
+        "duplicateRows": 0
+      },
+      {
+        "run": 2,
+        "achievedRps": 399.9,
+        "p50": 4.14,
+        "p95": 21.19,
+        "p99": 23.62,
+        "max": 49.1,
+        "created": 6000,
+        "coalesced": 18000,
+        "unexpected": 0,
+        "expectedUniqueKeys": 6000,
+        "dbRows": 6000,
+        "duplicateRows": 0
+      },
+      {
+        "run": 3,
+        "achievedRps": 397.5,
+        "p50": 4.22,
+        "p95": 22.39,
+        "p99": 58.89,
+        "max": 750.9,
+        "created": 5964,
+        "coalesced": 17891,
+        "unexpected": 0,
+        "expectedUniqueKeys": 5964,
+        "dbRows": 5964,
+        "duplicateRows": 0
+      },
+      {
+        "run": 4,
+        "achievedRps": 399.7,
+        "p50": 4.3,
+        "p95": 23.14,
+        "p99": 114.35,
+        "max": 296.7,
+        "created": 5998,
+        "unexpected": 0,
+        "expectedUniqueKeys": 5998,
+        "dbRows": 5998,
+        "duplicateRows": 0
+      },
+      {
+        "run": 5,
+        "achievedRps": 397.9,
+        "p50": 5.52,
+        "p95": 110.54,
+        "p99": 394.89,
+        "max": 887.0,
+        "created": 5970,
+        "unexpected": 0,
+        "expectedUniqueKeys": 5970,
+        "dbRows": 5970,
+        "duplicateRows": 0
+      },
+      {
+        "run": 6,
+        "achievedRps": 399.4,
+        "p50": 4.47,
+        "p95": 27.4,
+        "p99": 147.66,
+        "max": 354.0,
+        "created": 5993,
+        "unexpected": 0,
+        "expectedUniqueKeys": 5993,
+        "dbRows": 5993,
+        "duplicateRows": 0
+      }
     ],
-
     "correctness": {
       "totalRequests": 143689,
       "leaderExecutions": 35924,
@@ -40,14 +111,18 @@
       "unexpectedResponsesAcrossAllRuns": 0,
       "statement": "In every run, rows created equalled the unique idempotency-key count exactly, and COUNT(*) - COUNT(DISTINCT name) was 0. No run produced a response outside 200/201."
     },
-
     "latency": {
-      "p99RangeMs": [23.62, 394.89],
+      "p99RangeMs": [
+        23.62,
+        394.89
+      ],
       "p99MedianMs": 86.6,
-      "p50RangeMs": [4.14, 5.52],
+      "p50RangeMs": [
+        4.14,
+        5.52
+      ],
       "comment": "Tail latency is not stable run to run, and the spread widened across the session as the laptop warmed. The median p99 is the number worth quoting; the range is the number worth admitting."
     },
-
     "leaseHealth": {
       "lockSteals": 0,
       "fencedRollbacks": 0,
@@ -56,64 +131,176 @@
       "comment": "Zero steals across 143,689 requests is the lease-renewal fix working. Before renewal was added, a leader slower than its 800ms lease was stolen from, and the replacement could be stolen from in turn."
     }
   },
-
   "history": {
     "designA_reject409": {
       "description": "First implementation. Concurrent duplicates were answered immediately with 409 REQUEST_IN_FLIGHT and the client was expected to retry.",
       "runs": [
-        { "run": 1, "achievedRps": 399.99, "p99": 8.372, "created": 6001, "inFlight409": 4104, "dbRows": 6001, "duplicateRows": 0 },
-        { "run": 2, "achievedRps": 400.00, "p99": 8.507, "created": 6001, "inFlight409": 3942, "dbRows": 6001, "duplicateRows": 0 },
-        { "run": 3, "achievedRps": 399.97, "p99": 8.202, "created": 6001, "inFlight409": 3685, "dbRows": 6001, "duplicateRows": 0 }
+        {
+          "run": 1,
+          "achievedRps": 399.99,
+          "p99": 8.372,
+          "created": 6001,
+          "inFlight409": 4104,
+          "dbRows": 6001,
+          "duplicateRows": 0
+        },
+        {
+          "run": 2,
+          "achievedRps": 400.0,
+          "p99": 8.507,
+          "created": 6001,
+          "inFlight409": 3942,
+          "dbRows": 6001,
+          "duplicateRows": 0
+        },
+        {
+          "run": 3,
+          "achievedRps": 399.97,
+          "p99": 8.202,
+          "created": 6001,
+          "inFlight409": 3685,
+          "dbRows": 6001,
+          "duplicateRows": 0
+        }
       ],
-      "p99RangeMs": [8.202, 8.507],
+      "p99RangeMs": [
+        8.202,
+        8.507
+      ],
       "saturationSweep": {
         "note": "20s per step. Rows created equalled the unique-key count at every rate, including past the knee.",
         "steps": [
-          { "offeredRps": 800,  "achievedRps": 799.3,  "p99": 93.57,   "created": 3999, "expectedUniqueKeys": 3999 },
-          { "offeredRps": 1600, "achievedRps": 1581.7, "p99": 233.08,  "created": 7910, "expectedUniqueKeys": 7910 },
-          { "offeredRps": 2400, "achievedRps": 1907.8, "p99": 514.62,  "created": 9605, "expectedUniqueKeys": 9605 },
-          { "offeredRps": 3200, "achievedRps": 1834.8, "p99": 1036.95, "created": 9242, "expectedUniqueKeys": 9242 }
+          {
+            "offeredRps": 800,
+            "achievedRps": 799.3,
+            "p99": 93.57,
+            "created": 3999,
+            "expectedUniqueKeys": 3999
+          },
+          {
+            "offeredRps": 1600,
+            "achievedRps": 1581.7,
+            "p99": 233.08,
+            "created": 7910,
+            "expectedUniqueKeys": 7910
+          },
+          {
+            "offeredRps": 2400,
+            "achievedRps": 1907.8,
+            "p99": 514.62,
+            "created": 9605,
+            "expectedUniqueKeys": 9605
+          },
+          {
+            "offeredRps": 3200,
+            "achievedRps": 1834.8,
+            "p99": 1036.95,
+            "created": 9242,
+            "expectedUniqueKeys": 9242
+          }
         ],
         "saturationPointRps": 1908
       },
       "whyReplaced": "Replaced on instruction, to remove 409 from the client contract. It remains the lower-latency and more stable design."
     },
-
     "coalescingBeforeFencing": {
       "description": "Coalescing with lease steal but no transactional fencing and no lease renewal.",
       "defect": "One run produced 5,813 product rows against 5,785 idempotency keys: 28 duplicate products, matching that run's 28 lock steals exactly.",
       "rootCause": "A lease shows a leader stopped renewing, never that it stopped working. A slow leader had its key stolen mid-insert, and fencing only the settle stopped it recording a result but not committing its row.",
       "fix": "The operation moved inside the leader's transaction, committing atomically with the fenced ownership check. Lease renewal was added afterwards so a live-but-slow leader is not stolen from at all."
     },
-
     "pollIntervalSweep": {
       "note": "400 rps, 20s per step, measured before lease renewal existed. Polling faster is worse: each waiter issues a SELECT per poll, and hundreds of concurrent waiters saturate the pool and starve the leaders they wait on.",
       "steps": [
-        { "poolSize": 20,  "pollIntervalMs": 4,  "p99": 386.00, "duplicateRows": 0 },
-        { "poolSize": 60,  "pollIntervalMs": 4,  "p99": 273.53, "duplicateRows": 0 },
-        { "poolSize": 60,  "pollIntervalMs": 15, "p99": 74.97,  "duplicateRows": 0 },
-        { "poolSize": 100, "pollIntervalMs": 15, "p99": 70.68,  "duplicateRows": 0 },
-        { "poolSize": 100, "pollIntervalMs": 25, "p99": 112.97, "duplicateRows": 0 }
+        {
+          "poolSize": 20,
+          "pollIntervalMs": 4,
+          "p99": 386.0,
+          "duplicateRows": 0
+        },
+        {
+          "poolSize": 60,
+          "pollIntervalMs": 4,
+          "p99": 273.53,
+          "duplicateRows": 0
+        },
+        {
+          "poolSize": 60,
+          "pollIntervalMs": 15,
+          "p99": 74.97,
+          "duplicateRows": 0
+        },
+        {
+          "poolSize": 100,
+          "pollIntervalMs": 15,
+          "p99": 70.68,
+          "duplicateRows": 0
+        },
+        {
+          "poolSize": 100,
+          "pollIntervalMs": 25,
+          "p99": 112.97,
+          "duplicateRows": 0
+        }
       ],
       "conclusion": "A U-curve with its minimum near a 15ms poll. Pool size mattered far less than interval."
     }
   },
-
   "legacyBaseline": {
     "target": "pre-revamp backend/server.js, verbatim except one added `port` config line",
     "offeredRps": 400,
     "duration": "60s",
     "runs": [
-      { "run": 1, "achievedRps": 328.66, "p99": 348.798, "max": 12940.9,  "accepted201": 5929, "serverError500": 17782, "other": 86, "dbRows": 5929, "expectedUniqueProducts": 5950, "productsLost": 21 },
-      { "run": 2, "achievedRps": 400.01, "p99": 15.979,  "max": 112.107,  "accepted201": 6001, "serverError500": 18000, "dbRows": 6001, "productsLost": 0 },
-      { "run": 3, "achievedRps": 395.15, "p99": 347.609, "max": 1657.813, "accepted201": 5928, "serverError500": 17781, "dbRows": 5928, "productsLost": 0 },
-      { "run": 4, "achievedRps": 400.01, "p99": 118.210, "max": 210.99,   "accepted201": 6001, "serverError500": 18000, "dbRows": 6001, "productsLost": 0 }
+      {
+        "run": 1,
+        "achievedRps": 328.66,
+        "p99": 348.798,
+        "max": 12940.9,
+        "accepted201": 5929,
+        "serverError500": 17782,
+        "other": 86,
+        "dbRows": 5929,
+        "expectedUniqueProducts": 5950,
+        "productsLost": 21
+      },
+      {
+        "run": 2,
+        "achievedRps": 400.01,
+        "p99": 15.979,
+        "max": 112.107,
+        "accepted201": 6001,
+        "serverError500": 18000,
+        "dbRows": 6001,
+        "productsLost": 0
+      },
+      {
+        "run": 3,
+        "achievedRps": 395.15,
+        "p99": 347.609,
+        "max": 1657.813,
+        "accepted201": 5928,
+        "serverError500": 17781,
+        "dbRows": 5928,
+        "productsLost": 0
+      },
+      {
+        "run": 4,
+        "achievedRps": 400.01,
+        "p99": 118.21,
+        "max": 210.99,
+        "accepted201": 6001,
+        "serverError500": 18000,
+        "dbRows": 6001,
+        "productsLost": 0
+      }
     ],
-    "p99RangeMs": [15.979, 348.798],
+    "p99RangeMs": [
+      15.979,
+      348.798
+    ],
     "reproducible": "Every duplicate submit returned 500. Since duplicates are 75% of the injected workload, that is 18,000 of 24,001 requests. The product had in fact been created, so the caller could not tell a duplicate from an outage and retrying was unsafe.",
     "notReproducible": "Run 1 only: 328.66 rps, 12.9s max latency, 86 responses with no HTTP status, and 21 unique products never created. Three later runs showed none of it. Recorded as an unexplained cold-start artifact and excluded from every headline claim."
   },
-
   "headline": {
     "whatTheSystemDetermines": "Every duplicate submit is absorbed. Across 143,689 requests the database held exactly one row per idempotency key, with zero duplicates and zero responses outside 200/201.",
     "whatTheWorkloadFixes": "The 75% duplicate ratio is injected by the test, not discovered. It sets how many requests are duplicates; it says nothing about how well they are handled.",

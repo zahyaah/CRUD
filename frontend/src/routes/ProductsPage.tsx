@@ -141,7 +141,10 @@ export function ProductsPage() {
             </p>
           )}
 
+          {/* Keyed by product id so switching rows remounts the form. Without it the draft
+              state survives, and saving would write the previous row's values to this one. */}
           <ProductForm
+            key={editing.id}
             initial={toDraft(editing)}
             submitLabel="Save changes"
             pending={update.isPending}

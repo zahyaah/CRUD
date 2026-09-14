@@ -22,6 +22,11 @@ export function NewProductPage() {
           setIdempotencyKey(crypto.randomUUID());
           void navigate("/");
         },
+        // A failed attempt leaves the key bound to the body that failed. Reusing it after the
+        // user edits the form would be key reuse with a different payload, which the server
+        // rejects with 422 forever. Retrying the *same* body is still safe: the mutation
+        // itself is what carries the key, and this only runs once it has settled.
+        onError: () => setIdempotencyKey(crypto.randomUUID()),
       },
     );
   }

@@ -145,3 +145,32 @@ the earlier numbers came from code carrying the livelock and the wrong collation
 
 Decisions: [ADR-0009](adr/0009-key-identity.md), plus a lease-renewal section added to
 [ADR-0006](adr/0006-transactional-fencing.md).
+
+---
+
+## 2026-09-14 · Review pass over the whole revamp
+
+Reviewed `pre-revamp..HEAD` for correctness and separately for over-engineering.
+
+The over-engineering pass found nothing to cut: no unused exports across the three workspaces,
+no orphaned component props, largest file 288 lines. Earlier removals had already taken the
+slack out.
+
+The correctness pass found seven defects, all since fixed. The worst was a latent process-wide
+deadlock: a leader held a connection from the main pool and then ran its lease renewals against
+that same pool, so with `DB_POOL_SIZE` concurrent leaders every renewal queued behind the
+connections the transactions were holding, and nothing released. Load testing never reached it,
+because 400 rps against single-digit-millisecond operations keeps only two or three leaders in
+flight at once. Renewals now use a dedicated `leasePool`; they cannot share the transaction's
+connection either, since a renewal inside an uncommitted transaction is invisible to the other
+processes it exists to inform.
+
+The rest: `Date.parse` accepting impossible calendar dates and turning a bad request into a
+500, an edit form that kept its draft across rows and could save one row's values to another,
+an idempotency key that never rotated after a failed create and so rejected every corrected
+resubmit, a lease steal that reported itself as coalesced, body-parser failures answered as
+500 rather than 400 or 413, and a leader's typed error flattened to 500 before reaching its
+waiters.
+
+Re-measured afterwards at 400 rps: no regression, and rows created still equalled the unique
+key count with zero duplicates.
